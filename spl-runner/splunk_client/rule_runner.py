@@ -33,6 +33,8 @@ from splunk_client.config import SplunkConfig, load_config
 from splunk_client.exceptions import SplunkClientError, SplunkQueryValidationError
 from splunk_client.logger import setup_logging
 from splunk_client.search import run_search
+from splunk_client.schema_validator import validate_schema, write_validation_summary
+from splunk_client.validator import validate_query as _validate_query_for_schema
 from splunk_client.time_range import TimeRange, parse_time_range
 
 logger = logging.getLogger(__name__)
@@ -51,7 +53,13 @@ class RuleResult:
     error: str = ""
 
 
-def run_rules_from_excel(excel_path: str, config: SplunkConfig, time_range: Optional[TimeRange] = None) -> List[RuleResult]:
+def run_rules_from_excel(
+    excel_path: str,
+    config: SplunkConfig,
+    time_range: Optional[TimeRange] = None,
+    enforce_schema: bool = False,
+    write_summary: bool = False,
+) -> List[RuleResult]:
     """
     Reads an Excel rules file and executes each rule as a Splunk search.
 
@@ -112,6 +120,7 @@ def run_rules_from_excel(excel_path: str, config: SplunkConfig, time_range: Opti
     logger.info("Time range for all rules: %s  (earliest=%s  latest=%s)",
                 tr.description, tr.earliest, tr.latest)
     results: List[RuleResult] = []
+    summary_rows: List[dict] = []
 
     for idx, row in df.iterrows():
         rule_name = str(row.get(COLUMN_RULE_NAME, "")).strip()
@@ -126,6 +135,27 @@ def run_rules_from_excel(excel_path: str, config: SplunkConfig, time_range: Opti
 
         logger.info("--- Rule %d/%d: '%s' ---", len(results) + 1, total, rule_name)
         result = RuleResult(rule_name=rule_name, query=query)
+        schema_warning_summary = ""
+
+        # Schema validation — runs before submission when enforce or summary requested
+        if enforce_schema or write_summary:
+            try:
+                _clean = _validate_query_for_schema(query)
+                _sr    = validate_schema(_clean, enforce=enforce_schema)
+                schema_warning_summary = _sr.warning_summary()
+                if _sr.has_warnings:
+                    _sr.print_report()
+            except SplunkQueryValidationError as _schema_exc:
+                result.status = "FAILED_SCHEMA"
+                result.error  = str(_schema_exc).splitlines()[0]
+                logger.error("[%s] SCHEMA ENFORCEMENT FAILED: %s", rule_name, result.error)
+                summary_rows.append({
+                    "title": rule_name,
+                    "status": "FAIL",
+                    "failed_items": result.error,
+                })
+                results.append(result)
+                continue
 
         try:
             csv_path = run_search(query=query, config=config, rule_name=rule_name, time_range=tr)
@@ -145,10 +175,22 @@ def run_rules_from_excel(excel_path: str, config: SplunkConfig, time_range: Opti
             result.error  = f"Unexpected error: {exc}"
             logger.error("[%s] UNEXPECTED ERROR: %s", rule_name, exc, exc_info=True)
 
+        # Add row to validation summary
+        is_pass = result.status == "PASSED"
+        summary_rows.append({
+            "title": rule_name,
+            "status": "PASS" if is_pass else "FAIL",
+            "failed_items": "" if is_pass else " | ".join(
+                filter(None, [schema_warning_summary, result.error])
+            ),
+        })
         results.append(result)
 
     _print_summary(results)
     _save_summary_csv(results, config.results_dir)
+    if write_summary and summary_rows:
+        summary_path = write_validation_summary(summary_rows, config.results_dir)
+        print(f"\n  Validation summary: {summary_path}\n")
     return results
 
 

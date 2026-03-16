@@ -74,6 +74,7 @@ VALID_SOURCE_PREFIXES: Tuple[str, ...] = (
     "source=",
     "host=",
     "|",
+    "`",       # bare macro as first token e.g. `windows_logging_event_streamer`
     "tstats",
     "mstats",
     "inputlookup",

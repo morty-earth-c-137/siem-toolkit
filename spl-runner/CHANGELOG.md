@@ -400,3 +400,91 @@ Behaviour per Splunk docs for comment before a generating command:
 
 Single/double backtick macros (e.g. `drop_dm_object_name(Processes)`)
 are unaffected — they use one or two backticks, not three.
+
+---
+
+## [4.3.4] — GitHub Actions Version Updates
+
+### Fixed
+- `.github/workflows/splunk_search.yml` — updated all action versions to
+  current latest to resolve Node.js 20 deprecation warnings:
+    actions/checkout@v4      -> actions/checkout@v6
+    actions/setup-python@v5  -> actions/setup-python@v6
+    actions/upload-artifact@v4 -> actions/upload-artifact@v6
+
+  v3 of upload-artifact was deprecated January 30 2025 and causes workflow
+  failures. v4/v5 run on Node.js 20 which is now also deprecated. v6 runs
+  on Node.js 24 and is the current stable version.
+
+---
+
+## [4.3.5] — Validator: Macro-as-First-Token Support
+
+### Fixed — splunk_client/validator.py
+A query starting with a bare backtick macro and nothing before it was
+incorrectly rejected by the source command check:
+
+  `windows_logging_event_streamer`                  ← was REJECTED
+  `windows_logging_event_streamer` | stats count    ← was REJECTED
+
+The validator only accepted macros preceded by a pipe:
+  |`windows_logging_event_streamer`                 ← was accepted
+  | `windows_logging_event_streamer`                ← was accepted
+
+Fix: added `"\`"` to VALID_SOURCE_PREFIXES so a bare backtick macro
+is recognised as a valid pipeline-opening token. This matches Splunk
+behaviour — a macro can be a generating command and the sole entry
+point of a query with no pipe prefix required.
+
+All four forms now pass:
+  `macro`
+  `macro` | stats count by host
+  |`macro`
+  | `macro` | stats count by host
+
+---
+
+## [4.3.6] — Schema Enforcement + Validation Summary CSV + Field Check Fixes
+
+### Fixed — schema_validator.py (_check_fields)
+Two false positives in the sourcetype/datamodel field check:
+
+1. Quoted string values (e.g. process_name="cmd.exe") were contributing
+   'exe' as an extracted field name. Fixed by stripping all quoted string
+   values before field extraction in _strip_quoted_values().
+
+2. Datamodel reference parts (e.g. Endpoint.Processes in datamodel=...)
+   were being extracted as field names. Fixed by collecting all parts of
+   datamodel= references and excluding them from the field check set.
+
+### Added — --enforce-schema flag
+When passed, any schema warning blocks submission to Splunk and exits
+with a clear error listing each failing item.
+
+  python main.py --query '...' --enforce-schema
+  python main.py --rules rules.csv --enforce-schema
+  python main.py --optimize '...' --enforce-schema
+
+Behaviour:
+  --validate-schema alone  -> warns, never blocks
+  --enforce-schema         -> warns AND blocks on any warning
+  --enforce-schema implies --validate-schema (no need to pass both)
+
+### Added -- --validation-summary flag
+When passed with --rules, writes a clean CSV after the run with one
+row per rule.
+
+  python main.py --rules rules.csv --validation-summary
+  python main.py --rules rules.csv --enforce-schema --validation-summary
+
+Output file: search_results/_validation_summary_YYYYMMDD_HHMMSS.csv
+
+Columns:
+  title        — rule name from the rules file (title column)
+  status       — PASS or FAIL
+  failed_items — pipe-separated list of warnings/errors (empty on PASS)
+
+Example rows:
+  "Detect Brute Force","PASS",""
+  "Registry Autostart","FAIL","[field] Field 'fake_field' not in schema.yaml"
+  "Macro Detection","FAIL","[macro] `unknown_macro` not listed in schema.yaml"

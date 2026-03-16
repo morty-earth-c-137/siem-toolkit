@@ -52,7 +52,7 @@ from splunk_client.logger import setup_logging
 from splunk_client.rule_runner import run_rules_from_excel
 from splunk_client.search import run_search
 from splunk_client.query_optimizer import optimize_query
-from splunk_client.schema_validator import validate_schema
+from splunk_client.schema_validator import validate_schema, write_validation_summary
 from splunk_client.time_range import parse_time_range
 from splunk_client.validator import validate_query
 from splunk_client.exceptions import SplunkQueryValidationError
@@ -113,6 +113,27 @@ Examples:
             "Check the query against config/schema.yaml — validates macros, "
             "indexes, sourcetypes, datamodels, and field combinations. "
             "Warnings only, does not block submission."
+        ),
+    )
+    parser.add_argument(
+        "--enforce-schema",
+        action="store_true",
+        default=False,
+        dest="enforce_schema",
+        help=(
+            "Enforce schema checks — any schema warning blocks submission "
+            "to Splunk and exits with an error. Implies --validate-schema."
+        ),
+    )
+    parser.add_argument(
+        "--validation-summary",
+        action="store_true",
+        default=False,
+        dest="validation_summary",
+        help=(
+            "Write a validation summary CSV after running --rules. "
+            "Columns: title, status (PASS/FAIL), failed_items. "
+            "Saved to the results directory alongside search CSVs."
         ),
     )
     parser.add_argument(
@@ -202,8 +223,8 @@ def main() -> None:
         opt = optimize_query(clean)
         opt.print_report()
 
-        if args.validate_schema:
-            sr = validate_schema(clean)
+        if args.validate_schema or args.enforce_schema:
+            sr = validate_schema(clean, enforce=args.enforce_schema)
             sr.print_report()
 
         sys.exit(0)
@@ -223,8 +244,8 @@ def main() -> None:
                 logger.error("Validation failed: %s", exc)
                 sys.exit(1)
 
-            if args.validate_schema:
-                sr = validate_schema(clean)
+            if args.validate_schema or args.enforce_schema:
+                sr = validate_schema(clean, enforce=args.enforce_schema)
                 sr.print_report()
 
         if args.dry_run:
@@ -276,8 +297,8 @@ def main() -> None:
                     print(f"  {'='*56}")
                     try:
                         clean = validate_query(query_str)
-                        if args.validate_schema:
-                            sr = validate_schema(clean)
+                        if args.validate_schema or args.enforce_schema:
+                            sr = validate_schema(clean, enforce=args.enforce_schema)
                             sr.print_report()
                     except SplunkQueryValidationError as exc:
                         print(f"  [VALIDATION FAILED] {exc}\n")
@@ -294,6 +315,8 @@ def main() -> None:
                 excel_path=args.rules,
                 config=config,
                 time_range=time_range,
+                enforce_schema=args.enforce_schema,
+                write_summary=args.validation_summary,
             )
         except (FileNotFoundError, ValueError) as exc:
             logger.error("Rule runner failed: %s", exc)
