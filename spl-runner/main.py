@@ -179,9 +179,13 @@ def main() -> None:
     setup_logging(level=logging.DEBUG if args.debug else logging.INFO)
     logger = logging.getLogger(__name__)
 
-    # --- Load config (needed for --query and --rules; skipped for --optimize alone) ---
+    # --- Load config ---
+    # Skipped for --optimize (never contacts Splunk)
+    # Skipped for --dry-run (validates only, never submits)
+    # Required for --query and --rules without --dry-run
     config = None
-    if args.query or args.rules:
+    needs_config = (args.query or args.rules) and not getattr(args, 'dry_run', False)
+    if needs_config:
         try:
             config = load_config()
         except SplunkConfigError as exc:
@@ -267,8 +271,9 @@ def main() -> None:
     # Validate + optionally analyse all rules, then submit (unless --dry-run).
     # =========================================================================
     elif args.rules:
-        # Per-rule analysis if --validate-schema requested
-        if args.validate_schema or args.dry_run:
+        # Per-rule analysis if --validate-schema / --enforce-schema / --dry-run requested
+        preflight_summary_rows = []
+        if args.validate_schema or args.enforce_schema or args.dry_run or args.validation_summary:
             import pandas as pd
             try:
                 ext = os.path.splitext(args.rules)[1].lower()
@@ -295,19 +300,40 @@ def main() -> None:
                     print(f"  {'='*56}")
                     print(f"  Rule: {rule_name}")
                     print(f"  {'='*56}")
+                    row_status = "PASS"
+                    row_failed = ""
                     try:
                         clean = validate_query(query_str)
                         if args.validate_schema or args.enforce_schema:
                             sr = validate_schema(clean, enforce=args.enforce_schema)
                             sr.print_report()
+                            if sr.has_warnings:
+                                row_status = "FAIL"
+                                row_failed = sr.warning_summary()
                     except SplunkQueryValidationError as exc:
+                        row_status = "FAIL"
+                        row_failed = str(exc).splitlines()[0]
                         print(f"  [VALIDATION FAILED] {exc}\n")
+                    preflight_summary_rows.append({
+                        "title":        rule_name,
+                        "status":       row_status,
+                        "failed_items": row_failed,
+                    })
             except Exception as exc:
                 logger.error("Could not read rules file: %s", exc)
                 sys.exit(1)
 
         if args.dry_run:
             print("  [DRY RUN] Rules validated. Not submitted to Splunk.\n")
+            # Write validation summary CSV before exiting if requested
+            if args.validation_summary and preflight_summary_rows:
+                results_dir = (
+                    config.results_dir if config
+                    else os.path.join(os.path.dirname(os.path.abspath(args.rules)), "search_results")
+                )
+                os.makedirs(results_dir, exist_ok=True)
+                summary_path = write_validation_summary(preflight_summary_rows, results_dir)
+                print(f"  Validation summary: {summary_path}\n")
             sys.exit(0)
 
         try:

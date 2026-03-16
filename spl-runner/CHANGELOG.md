@@ -488,3 +488,52 @@ Example rows:
   "Detect Brute Force","PASS",""
   "Registry Autostart","FAIL","[field] Field 'fake_field' not in schema.yaml"
   "Macro Detection","FAIL","[macro] `unknown_macro` not listed in schema.yaml"
+
+---
+
+## [4.3.7] — Fix: load_config() skipped for --dry-run (CI validate job)
+
+### Fixed — main.py
+The CI/CD validate job runs:
+  python main.py --rules rules.csv --dry-run --validate-schema
+
+This job intentionally has no SPLUNK_HOST or SPLUNK_TOKEN — it only
+validates rules, never submits. However load_config() was called for
+any --query or --rules invocation regardless of --dry-run, causing the
+validate job to fail with "SPLUNK_HOST has not been set".
+
+Fix: load_config() is now skipped when --dry-run is set. Credentials
+are only loaded when a submission to Splunk is actually going to happen.
+
+Conditions that now skip load_config():
+  --optimize              (never submits — no credentials needed)
+  --query   --dry-run     (validates only — no credentials needed)
+  --rules   --dry-run     (validates only — no credentials needed)
+
+Conditions that still require credentials:
+  --query   (without --dry-run)
+  --rules   (without --dry-run)
+
+---
+
+## [4.3.7] — Dry-Run Summary Fix + Auto results_dir
+
+### Fixed
+- `--dry-run --validation-summary` now correctly writes the validation
+  summary CSV before exiting. Previously the dry-run path called
+  sys.exit(0) before run_rules_from_excel was ever reached, so the
+  summary was silently never written.
+
+  The pre-flight rule loop now collects a summary row per rule
+  (title, status, failed_items) during validation. When --dry-run
+  exits, it writes the CSV first if --validation-summary was passed.
+
+- `search_results/` directory is created automatically — you do NOT
+  need to create it manually. makedirs(exist_ok=True) is called before
+  any CSV write, including dry-run summary output.
+
+### Flags that now work together correctly
+  --rules FILE --dry-run --validation-summary
+  --rules FILE --dry-run --validate-schema --validation-summary
+  --rules FILE --dry-run --enforce-schema --validation-summary
+  --rules FILE --enforce-schema --validation-summary  (submit mode)
