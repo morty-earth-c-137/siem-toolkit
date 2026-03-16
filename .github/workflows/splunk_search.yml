@@ -65,9 +65,9 @@ jobs:
         working-directory: spl-runner       # all steps run from inside spl-runner/
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -99,9 +99,9 @@ jobs:
         working-directory: spl-runner       # all steps run from inside spl-runner/
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -132,7 +132,7 @@ jobs:
           python main.py --rules "$RULES" --time "$TIME"
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: splunk-results-${{ github.run_number }}
