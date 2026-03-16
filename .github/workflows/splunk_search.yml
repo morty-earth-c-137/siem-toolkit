@@ -124,6 +124,14 @@ jobs:
           SIEM_TARGET:           ${{ github.event.inputs.siem_target || '' }}
           SPLUNK_VERIFY_SSL:     ${{ vars.SPLUNK_VERIFY_SSL || 'true' }}
         run: |
+          # Skip gracefully if no credentials are configured yet.
+          # Add SPLUNK_HOST and SPLUNK_TOKEN in:
+          #   Settings -> Secrets and variables -> Actions -> New repository secret
+          if [ -z "$SPLUNK_HOST" ] || [ -z "$SPLUNK_TOKEN" ]; then
+            echo "::notice::SPLUNK_HOST or SPLUNK_TOKEN not configured — skipping search run."
+            echo "To enable: add SPLUNK_HOST and SPLUNK_TOKEN in repository secrets."
+            exit 0
+          fi
           RULES="${{ github.event.inputs.rules_file || vars.RULES_FILE || 'rules.csv' }}"
           TIME="${{ github.event.inputs.time_range || vars.TIME_RANGE || '30m' }}"
           echo "Rules file : $RULES"
