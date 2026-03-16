@@ -1,0 +1,6 @@
+
+# snowincident
+
+The snowincident command is used with the Splunk Add-on for ServiceNow.
+
+For information about this command, see Use custom generating search commands for the Splunk Add-on for ServiceNow in Splunk Add-on for ServiceNow .

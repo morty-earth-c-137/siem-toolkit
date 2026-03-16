@@ -1,0 +1,166 @@
+# =============================================================================
+# .gitlab-ci.yml — Splunk Client Pipeline
+# =============================================================================
+#
+# PIPELINE OVERVIEW
+# -----------------
+# Stage 1 — validate   : Run query validation and optimizer on rules files.
+#                        No Splunk connection required. Runs on every push.
+#
+# Stage 2 — search     : Submit validated rules to Splunk and save results.
+#                        Requires Splunk credentials. Protected branches only.
+#
+# REQUIRED CI/CD VARIABLES (Settings > CI/CD > Variables)
+# --------------------------------------------------------
+# For a single SIEM target:
+#   SPLUNK_HOST       Masked + Protected   your-org.splunkcloud.com
+#   SPLUNK_TOKEN      Masked + Protected   eyJr...
+#
+# For multiple SIEM targets (set SIEM_TARGET per job to select):
+#   SPLUNK_HOST_PROD      Masked + Protected   prod.splunkcloud.com
+#   SPLUNK_TOKEN_PROD     Masked + Protected   eyJr... (prod token)
+#   SPLUNK_HOST_STAGING   Masked + Protected   staging.splunkcloud.com
+#   SPLUNK_TOKEN_STAGING  Masked + Protected   eyJr... (staging token)
+#   SPLUNK_HOST_LAB       Masked + Protected   lab.splunkcloud.com
+#   SPLUNK_TOKEN_LAB      Masked + Protected   eyJr... (lab token)
+#
+# OPTIONAL CI/CD VARIABLES
+# -------------------------
+#   SIEM_TARGET           Which named target to use (prod / staging / lab)
+#   SPLUNK_VERIFY_SSL     Set to "false" for self-signed certs (lab only)
+#   SPLUNK_JOB_MAX_WAIT   Seconds to wait for job completion (default: 120)
+#   TIME_RANGE            Time window for searches (default: 30m)
+#   RULES_FILE            Path to rules file inside the repo (default: rules.csv)
+#
+# NOTE: SPLUNK_HOST and SPLUNK_TOKEN are intentionally NOT in this file.
+#       They are injected at runtime from GitLab CI/CD Variables only.
+#       Never hardcode credentials in .gitlab-ci.yml.
+# =============================================================================
+
+stages:
+  - validate
+  - search
+
+# =============================================================================
+# Shared configuration — inherited by all jobs
+# =============================================================================
+default:
+  image: python:3.11-slim
+  before_script:
+    - pip install --quiet -r requirements.txt
+  # AUTH_MODE=env tells config.py to read credentials from CI/CD variables only
+  # settings.py does not exist on the runner (it is gitignored)
+  variables:
+    AUTH_MODE:          "env"
+    SPLUNK_VERIFY_SSL:  "true"
+    SPLUNK_TIMEOUT:     "30"
+    SPLUNK_JOB_MAX_WAIT: "120"
+    TIME_RANGE:         "30m"
+    RULES_FILE:         "rules.csv"
+
+# =============================================================================
+# STAGE 1 — validate
+# Runs on every push to any branch.
+# No Splunk credentials needed — purely local analysis.
+# =============================================================================
+
+# Validate all rules using --optimize and --validate-schema.
+# Fails the pipeline if any rule contains a forbidden command or broken syntax.
+validate_rules:
+  stage: validate
+  script:
+    - echo "Validating rules file - ${RULES_FILE}"
+    - python main.py --rules "${RULES_FILE}" --dry-run --validate-schema
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+  allow_failure: false
+
+# =============================================================================
+# STAGE 2 — search
+# Submits rules to Splunk and saves results as pipeline artifacts.
+# Only runs on protected branches (main / master).
+# Requires SPLUNK_HOST and SPLUNK_TOKEN (or SIEM_TARGET variants) to be set.
+# =============================================================================
+
+# Run against the default SIEM target
+search_default:
+  stage: search
+  script:
+    - echo "Running rules against Splunk (target=${SIEM_TARGET:-default})"
+    - python main.py --rules "${RULES_FILE}" --time "${TIME_RANGE}"
+  artifacts:
+    name: "splunk-results-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - search_results/
+    expire_in: 7 days
+    when: always
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  environment:
+    name: production
+
+# Run against the production SIEM — triggered manually or on tag
+search_prod:
+  stage: search
+  variables:
+    SIEM_TARGET: "prod"
+  script:
+    - echo "Running rules against PRODUCTION SIEM"
+    - python main.py --rules "${RULES_FILE}" --time "${TIME_RANGE}"
+  artifacts:
+    name: "splunk-results-prod-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - search_results/
+    expire_in: 30 days
+    when: always
+  rules:
+    - if: '$CI_COMMIT_TAG'                          # auto on tag
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual                                  # manual trigger on main
+  environment:
+    name: production
+
+# Run against the staging SIEM
+search_staging:
+  stage: search
+  variables:
+    SIEM_TARGET: "staging"
+  script:
+    - echo "Running rules against STAGING SIEM"
+    - python main.py --rules "${RULES_FILE}" --time "${TIME_RANGE}"
+  artifacts:
+    name: "splunk-results-staging-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - search_results/
+    expire_in: 7 days
+    when: always
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH =~ /^staging/'
+  environment:
+    name: staging
+
+# Run against the lab SIEM — SSL verification disabled for self-signed certs
+search_lab:
+  stage: search
+  variables:
+    SIEM_TARGET:        "lab"
+    SPLUNK_VERIFY_SSL:  "false"
+  script:
+    - echo "Running rules against LAB SIEM (SSL verification disabled)"
+    - python main.py --rules "${RULES_FILE}" --time "${TIME_RANGE}"
+  artifacts:
+    name: "splunk-results-lab-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - search_results/
+    expire_in: 3 days
+    when: always
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH =~ /^lab/'
+  environment:
+    name: lab

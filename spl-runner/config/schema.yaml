@@ -1,0 +1,313 @@
+# =============================================================================
+# schema.yaml — Splunk Environment Schema Configuration
+# =============================================================================
+#
+# This file defines what is valid in YOUR Splunk environment:
+#   - macros       : known backtick macros your Splunk instance has defined
+#   - indexes      : indexes you are allowed to search
+#   - sourcetypes  : valid sourcetypes
+#   - datamodels   : accelerated data models available
+#   - fields       : per-sourcetype field definitions (for --validate-schema)
+#
+# HOW TO USE:
+#   Add your own values under each section. The validator reads this file
+#   when --validate-schema is passed as a command flag.
+#
+#   Leave a section empty ([]) to skip validation for that category.
+#   Set enabled: false on a section to disable it entirely.
+#
+# FIELD VALIDATION (sourcetype_fields):
+#   When --validate-schema is active, the validator checks that fields used
+#   in your query actually exist for the sourcetype(s) referenced.
+#   Add new sourcetype+field combos here as you discover them.
+#   This is intentionally easy to extend — just add rows in YAML format.
+#
+# =============================================================================
+
+
+# =============================================================================
+# MACROS
+# Backtick macros used in queries: `macro_name`
+# Add every macro your Splunk environment has defined.
+# The validator will warn if a query uses a macro not listed here.
+# =============================================================================
+macros:
+  enabled: true
+  known:
+    # Splunk Security Content / ES macros (common defaults)
+    - security_content_summariesonly
+    - security_content_ctime
+    - drop_dm_object_name
+    - get_asset
+    - get_identity4events
+    - cim_corporate_web_proxy_indexes
+    - cim_network_traffic_indexes
+    - cim_endpoint_indexes
+    - cim_authentication_indexes
+    - cim_email_indexes
+    - cim_network_sessions_indexes
+    - cim_ids_attacks_indexes
+    # Add your custom macros below:
+    # - my_custom_macro
+    # - another_macro
+
+
+# =============================================================================
+# INDEXES
+# Indexes your environment has and you are allowed to search.
+# The validator will warn if a query references an unknown index.
+# =============================================================================
+indexes:
+  enabled: true
+  known:
+    - main
+    - _internal
+    - _audit
+    - _introspection
+    - summary
+    - history
+    # Common security/enterprise indexes — remove any not in your environment:
+    - botsv1
+    - botsv2
+    - botsv3
+    - windows
+    - linux
+    - network
+    - endpoint
+    - authentication
+    - email
+    - web
+    - dns
+    - firewall
+    - proxy
+    - cloud
+    # Add your environment-specific indexes below:
+    # - my_custom_index
+
+
+# =============================================================================
+# SOURCETYPES
+# Known sourcetypes in your environment.
+# =============================================================================
+sourcetypes:
+  enabled: true
+  known:
+    # Windows
+    - WinEventLog
+    - WinEventLog:Security
+    - WinEventLog:System
+    - WinEventLog:Application
+    - XmlWinEventLog
+    - XmlWinEventLog:Security
+    - MSWinEventLog
+    - Sysmon
+    - sysmon
+    # Linux/Unix
+    - syslog
+    - linux_secure
+    - linux_audit
+    - auth
+    - bash_history
+    # Network
+    - cisco:asa
+    - cisco:ios
+    - palo-alto:traffic
+    - palo-alto:threat
+    - juniper:junos:firewall
+    - checkpoint:firewall
+    - fortinet:firewall
+    # Web / Proxy
+    - access_combined
+    - access_combined_wcookie
+    - apache:access
+    - iis
+    - bluecoat:proxysg:access:syslog
+    - squid
+    # Endpoint
+    - CarbonBlack:Protection:Alert
+    - crowdstrike:events:sensor
+    - crowdstrike:telemetry:events
+    # Authentication
+    - oktaim2:log
+    - azure:aad:audit
+    # Cloud
+    - aws:cloudtrail
+    - aws:config
+    - aws:cloudwatch
+    - gcp:audit
+    # Add your environment sourcetypes below:
+    # - my_custom_sourcetype
+
+
+# =============================================================================
+# DATA MODELS
+# Accelerated data models available in your environment.
+# Used when validating tstats queries.
+# =============================================================================
+datamodels:
+  enabled: true
+  known:
+    # CIM Data Models
+    - Alerts
+    - Authentication
+    - Certificates
+    - Change
+    - Change_Analysis
+    - Compute_Inventory
+    - DLP
+    - Databases
+    - Email
+    - Endpoint
+    - Event_Signatures
+    - Intrusion_Detection
+    - JVM
+    - Malware
+    - Network_Resolution
+    - Network_Sessions
+    - Network_Traffic
+    - Performance
+    - Ticket_Management
+    - Updates
+    - Vulnerabilities
+    - Web
+    # Add custom data models below:
+    # - My_Custom_Model
+
+
+# =============================================================================
+# SOURCETYPE FIELD DEFINITIONS
+# Defines which fields are valid for each sourcetype.
+# Used when --validate-schema is passed to check field usage in queries.
+#
+# Format:
+#   sourcetype_fields:
+#     <sourcetype_name>:
+#       fields:
+#         - field_name
+#       notes: "optional description"
+#
+# This section is intentionally starter-populated.
+# Expand with your actual field names as you build more rules.
+# =============================================================================
+sourcetype_fields:
+  enabled: true
+
+  WinEventLog:Security:
+    notes: "Windows Security Event Log fields (common)"
+    fields:
+      - EventCode
+      - Account_Name
+      - Account_Domain
+      - src_ip
+      - dest_ip
+      - dest
+      - src
+      - user
+      - Logon_Type
+      - Process_Name
+      - Process_ID
+      - Subject_Account_Name
+      - Subject_Domain_Name
+      - Target_Account_Name
+      - Target_Domain_Name
+      - Failure_Reason
+      - Keywords
+      - host
+      - index
+      - sourcetype
+      - _time
+      - signature
+      - signature_id
+
+  Sysmon:
+    notes: "Sysmon (Microsoft Sysinternals) event fields"
+    fields:
+      - EventCode
+      - EventDescription
+      - Image
+      - OriginalFileName
+      - CommandLine
+      - CurrentDirectory
+      - User
+      - ProcessGuid
+      - ProcessId
+      - ParentProcessGuid
+      - ParentProcessId
+      - ParentImage
+      - ParentCommandLine
+      - TargetFilename
+      - SourceIp
+      - DestinationIp
+      - DestinationPort
+      - Protocol
+      - RuleName
+      - host
+      - dest
+      - src
+      - _time
+
+  syslog:
+    notes: "Generic syslog fields"
+    fields:
+      - host
+      - source
+      - sourcetype
+      - severity
+      - facility
+      - pid
+      - program
+      - message
+      - _time
+      - index
+
+  aws:cloudtrail:
+    notes: "AWS CloudTrail fields"
+    fields:
+      - eventName
+      - eventSource
+      - eventType
+      - awsRegion
+      - sourceIPAddress
+      - userAgent
+      - userIdentity.type
+      - userIdentity.arn
+      - userIdentity.accountId
+      - requestParameters
+      - responseElements
+      - errorCode
+      - errorMessage
+      - _time
+      - host
+
+  # CIM Endpoint.Processes (data model fields — used with tstats)
+  Endpoint.Processes:
+    notes: "CIM Endpoint data model — Processes dataset fields"
+    fields:
+      - action
+      - dest
+      - original_file_name
+      - parent_process
+      - parent_process_exec
+      - parent_process_guid
+      - parent_process_id
+      - parent_process_name
+      - parent_process_path
+      - process
+      - process_exec
+      - process_guid
+      - process_hash
+      - process_id
+      - process_integrity_level
+      - process_name
+      - process_path
+      - user
+      - user_id
+      - vendor_product
+      - _time
+
+  # Add more sourcetypes below following the same format:
+  # my_sourcetype:
+  #   notes: "Description of this sourcetype"
+  #   fields:
+  #     - field1
+  #     - field2

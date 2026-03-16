@@ -1,0 +1,43 @@
+"""
+settings.py.example
+--------------------
+Copy this file to settings.py and fill in your values.
+
+    cp splunk_client/settings.py.example splunk_client/settings.py
+
+settings.py is gitignored — it stays on your machine only.
+Never commit settings.py with real credentials.
+"""
+
+# =============================================================================
+# DEFAULT TARGET — set these for local use
+# =============================================================================
+
+# Your Splunk Cloud hostname (the part after https:// in your browser)
+# Example: "mycompany.splunkcloud.com"
+SPLUNK_HOST: str = "your-organisation.splunkcloud.com"  # <-- SET THIS
+
+# Your Splunk Bearer token
+# Generate: Splunk Web -> Settings -> Tokens -> New Token
+SPLUNK_TOKEN: str = "paste-your-token-here"             # <-- SET THIS
+
+# Splunk REST API port — always 8089 for Splunk Cloud
+SPLUNK_PORT: int = 8089
+
+# =============================================================================
+# NAMED SIEM TARGETS — for multi-SIEM environments
+# Uncomment and fill in the targets you use.
+# In CI/CD these are set as pipeline variables, not here.
+# =============================================================================
+
+# Production SIEM
+# SPLUNK_HOST_PROD:    str = "prod.splunkcloud.com"
+# SPLUNK_TOKEN_PROD:   str = "paste-prod-token-here"
+
+# Staging / QA SIEM
+# SPLUNK_HOST_STAGING: str = "staging.splunkcloud.com"
+# SPLUNK_TOKEN_STAGING: str = "paste-staging-token-here"
+
+# Lab / Dev SIEM
+# SPLUNK_HOST_LAB:     str = "lab.splunkcloud.com"
+# SPLUNK_TOKEN_LAB:    str = "paste-lab-token-here"

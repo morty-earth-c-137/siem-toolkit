@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "splunk-client"
+version = "4.3.3"
+description = "Splunk Cloud REST API client — search, validate, and export to CSV"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.32.3",
+    "python-dotenv>=1.0.1",
+    "pandas>=2.2.2",
+    "openpyxl>=3.1.2",
+]
+
+[project.scripts]
+# After pip install -e . you can run from anywhere: splunk-client --query "..."
+splunk-client = "main:main"
+
+[tool.setuptools.packages.find]
+# Flat layout — splunk_client/ sits directly next to pyproject.toml.
+# No src/ subdirectory required. Works in any directory, any path, any name.
+where = ["."]
+include = ["splunk_client*"]

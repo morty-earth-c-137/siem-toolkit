@@ -1,0 +1,49 @@
+# =============================================================================
+# .gitignore — Splunk Client
+# =============================================================================
+
+# --- CREDENTIALS ---
+# settings.py is committed with placeholder values so the project works
+# immediately after cloning. It contains NO real credentials.
+# Real values are set locally or via CI/CD environment variables.
+# DO NOT commit settings.py with real tokens — the placeholders are safe.
+
+# --- RUNTIME CONFIG ---
+# .env is gitignored because users may add credential overrides to it.
+# The base .env file (with no credentials) is safe and ships with the project.
+# If you add SPLUNK_HOST or SPLUNK_TOKEN to .env, it must stay out of Git.
+.env
+
+# --- SEARCH RESULTS (may contain sensitive data) ---
+search_results/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+splunk_venv/
+myenv/
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- IDEs ---
+.idea/
+.vscode/
+*.swp
+*.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log

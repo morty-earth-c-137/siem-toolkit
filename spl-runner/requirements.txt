@@ -1,0 +1,21 @@
+# Splunk Cloud API Client — Python dependencies
+# Install with: pip install -r requirements.txt
+#
+# All versions are pinned to ensure reproducible installs.
+# Update versions carefully and retest after upgrades.
+
+# HTTP requests with retry and session support
+requests==2.32.3
+
+# Environment variable loading from .env files
+python-dotenv==1.0.1
+
+# Excel file reading for rule_runner module
+pandas==2.2.2
+openpyxl==3.1.2
+
+# Type checking support (runtime, not dev-only for py3.8 compat)
+typing-extensions==4.12.2
+
+# YAML parsing for schema.yaml
+pyyaml>=6.0.1
